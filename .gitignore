@@ -36,7 +36,13 @@ __pycache__/
 # C extensions
 *.so
 
-.idea
+.idea/.gitignore
+.idea/deployment.xml
+.idea/inspectionProfiles/profiles_settings.xml
+.idea/looksam.iml
+.idea/misc.xml
+.idea/modules.xml
+
 
 # Distribution / packaging
 .Python
