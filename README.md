@@ -26,7 +26,7 @@ optimizer = LookSAM(
     k=10,
     alpha=0.7,
     params=model.parameters(),
-    base_optimizer=torch.optim.SGD,
+    base_optimizer=base_optimizer,
     rho=0.1,
     **kwargs
 )
