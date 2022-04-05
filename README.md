@@ -14,8 +14,6 @@ Currently it is only proposed an algorithm without layer-wise adaptive rates (bu
 
 ## Usage
 ```python
-
-import torch
 from looksam import LookSAM
 
 model = YourModel()
