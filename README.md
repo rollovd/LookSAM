@@ -23,7 +23,7 @@ base_optimizer = YourBaseOptimizer
 optimizer = LookSAM(
     k=10,
     alpha=0.7,
-    params=model.parameters(),
+    model=model,
     base_optimizer=base_optimizer,
     rho=0.1,
     **kwargs
