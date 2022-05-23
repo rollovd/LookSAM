@@ -23,6 +23,13 @@ class LookSAM(torch.optim.Optimizer):
             model = YourModel()
             criterion = YourCriterion()
             base_optimizer = YourBaseOptimizer
+            optimizer = LookSAM(k=k,
+                                alpha=alpha,
+                                model=model,
+                                base_optimizer=base_optimizer,
+                                criterion=criterion,
+                                rho=rho,
+                                **kwargs)
 
             ...
 
@@ -52,38 +59,40 @@ class LookSAM(torch.optim.Optimizer):
         return g / g.norm(p=2)
 
     def step(self, t, samples, targets, zero_grad=False):
-        for group in self.param_groups:
-            scale = group['rho'] / (self._grad_norm() + 1e-12) if not t % self.k else None
-
-            if not t % self.k:
-                for index_p, p in enumerate(group['params']):
-                    if p.grad is None:
-                        continue
-
-                    self.state[p]['old_p'] = p.data.clone()
-                    self.state[f'old_grad_p_{index_p}']['old_grad_p'] = p.grad.clone()
-
-                    with torch.no_grad():
-                        e_w = p.grad * scale.to(p)
-                        p.add_(e_w)
-
-            if not t % self.k:
-                self.criterion(self.model(samples), targets).backward()
+        if not t % self.k:
+            group = self.param_groups[0]
+            scale = group['rho'] / (self._grad_norm() + 1e-8)
 
             for index_p, p in enumerate(group['params']):
-                if not t % self.k:
-                    old_grad_p = self.state[f'old_grad_p_{index_p}']['old_grad_p']
-                    g_grad_norm = LookSAM.normalized(old_grad_p)
-                    g_s_grad_norm = LookSAM.normalized(p.grad)
-                    self.state[f'gv_{index_p}']['gv'] = torch.sub(p.grad, p.grad.norm(p=2) * torch.sum(
-                                        g_grad_norm * g_s_grad_norm) * g_grad_norm)
+                if p.grad is None:
+                    continue
 
-                else:
-                    with torch.no_grad():
-                        gv = self.state[f'gv_{index_p}']['gv']
-                        p.grad.add_(self.alpha.to(p) * (p.grad.norm(p=2) / gv.norm(p=2)) * gv)
+                self.state[p]['old_p'] = p.data.clone()
+                self.state[f'old_grad_p_{index_p}']['old_grad_p'] = p.grad.clone()
 
-                p.data = self.state[p]['old_p']
+                with torch.no_grad():
+                    e_w = p.grad * scale.to(p)
+                    p.add_(e_w)
+
+            self.criterion(self.model(samples), targets).backward()
+
+        group = self.param_groups[0]
+        for index_p, p in enumerate(group['params']):
+            if p.grad is None:
+                continue
+            if not t % self.k:
+                old_grad_p = self.state[f'old_grad_p_{index_p}']['old_grad_p']
+                g_grad_norm = LookSAM.normalized(old_grad_p)
+                g_s_grad_norm = LookSAM.normalized(p.grad)
+                self.state[f'gv_{index_p}']['gv'] = torch.sub(p.grad, p.grad.norm(p=2) * torch.sum(
+                    g_grad_norm * g_s_grad_norm) * g_grad_norm)
+
+            else:
+                with torch.no_grad():
+                    gv = self.state[f'gv_{index_p}']['gv']
+                    p.grad.add_(self.alpha.to(p) * (p.grad.norm(p=2) / (gv.norm(p=2) + 1e-8) * gv))
+
+            p.data = self.state[p]['old_p']
 
         self.base_optimizer.step()
         if zero_grad:
