@@ -31,11 +31,13 @@ optimizer = LookSAM(
 
 ...
 
-for train_index, data in enumerate(loader):
+for train_index, (samples, targets) in enumerate(loader):
+    ...
+
     loss = criterion(model(samples), targets)
     loss.backward()
     optimizer.step(t=train_index, samples=samples, targets=targets, zero_grad=True)
 
-...
+    ...
 
 ```
