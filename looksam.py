@@ -1,9 +1,18 @@
 import torch
-from typing import Union
+import torch.nn as nn
+from typing import Any, Callable
 
 class LookSAM(torch.optim.Optimizer):
 
-    def __init__(self, k, alpha, model, base_optimizer, criterion, rho=0.05, **kwargs):
+    def __init__(self,
+                 k: int,
+                 alpha: float,
+                 model: nn.Module,
+                 base_optimizer: torch.optim.Optimizer,
+                 criterion: Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
+                 rho: float = 0.05,
+                 **kwargs: Any
+    ):
 
         """
         LookSAM algorithm: https://arxiv.org/pdf/2203.02714.pdf
@@ -33,10 +42,10 @@ class LookSAM(torch.optim.Optimizer):
 
             ...
 
-            for train_index, data in enumerate(loader):
+            for train_index, (samples, targets) in enumerate(loader):
                 loss = criterion(model(samples), targets)
                 loss.backward()
-                optimizer.step(t=train_index, samples=samples, targets=targets, zero_grad=True)
+                optimizer.step(t=train_index, samples=samples, targets=targets, zero_sam_grad=True, zero_grad=True)
 
             ...
 
@@ -58,7 +67,7 @@ class LookSAM(torch.optim.Optimizer):
     def normalized(g):
         return g / g.norm(p=2)
 
-    def step(self, t, samples, targets, zero_grad=False):
+    def step(self, t, samples, targets, zero_sam_grad=True, zero_grad=True):
         if not t % self.k:
             group = self.param_groups[0]
             scale = group['rho'] / (self._grad_norm() + 1e-8)
@@ -73,6 +82,9 @@ class LookSAM(torch.optim.Optimizer):
                 with torch.no_grad():
                     e_w = p.grad * scale.to(p)
                     p.add_(e_w)
+
+            if zero_sam_grad:
+                self.zero_grad()
 
             self.criterion(self.model(samples), targets).backward()
 
